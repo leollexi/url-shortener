@@ -77,6 +77,8 @@ PAGE = """
     input[type=url] { width: 100%; padding: 12px; font-size: 16px; box-sizing: border-box; }
     button { margin-top: 12px; padding: 12px 20px; font-size: 16px; background: #2d6cdf; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
     .result { margin-top: 24px; padding: 16px; background: #f0f5ff; border-radius: 8px; }
+    .back-link { display: inline-block; margin-top: 16px; padding: 10px 18px; background: #eee; color: #333; text-decoration: none; border-radius: 6px; }
+    .back-link:hover { background: #ddd; }
     a { color: #2d6cdf; }
     table { width: 100%; border-collapse: collapse; margin-top: 30px; }
     td, th { padding: 8px; border-bottom: 1px solid #eee; text-align: left; font-size: 14px; }
@@ -93,6 +95,7 @@ PAGE = """
     Готово! Короткая ссылка:
     <a href="{{ short }}">{{ short }}</a>
   </div>
+  <p><a class="back-link" href="/">← На главную</a></p>
   {% endif %}
   {% if links %}
   <table>
