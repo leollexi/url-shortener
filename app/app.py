@@ -1,3 +1,9 @@
+"""
+URL Shortener - сокращатель ссылок.
+Flask-приложение: принимает длинный URL, выдаёт короткий код,
+по короткому коду делает редирект на оригинал.
+Данные хранятся в PostgreSQL.
+"""
 import os
 import string
 import random
@@ -9,11 +15,22 @@ from flask import Flask, request, redirect, jsonify, render_template_string
 
 app = Flask(__name__)
 
-def build_short_url(code):
-	host = request.headers.get("X-Forwarded-Host") or request.host
-	scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
-	return f"{scheme}://{host}/{code}"
 
+def build_short_url(code):
+    """
+    Собрать короткую ссылку с ПРАВИЛЬНЫМ хостом и портом.
+
+    Приложение стоит за reverse proxy (Nginx), поэтому request.host_url
+    может не содержать внешний порт. Мы строим URL явно:
+    - берём Host из заголовка (Nginx передаёт его как localhost:8080);
+    - берём схему из X-Forwarded-Proto (http/https), если Nginx её прислал.
+    Это надёжнее, чем полагаться на автоматику.
+    """
+    host = request.headers.get("X-Forwarded-Host") or request.host  # host:port
+    scheme = request.headers.get("X-Forwarded-Proto", request.scheme)  # http/https
+    return f"{scheme}://{host}/{code}"
+
+# --- Настройки из переменных окружения (передаются через compose.yml) ---
 DB_HOST = os.environ.get("DB_HOST", "db")
 DB_NAME = os.environ.get("DB_NAME", "urls")
 DB_USER = os.environ.get("DB_USER", "admin")
@@ -119,7 +136,7 @@ def index():
     """Главная страница со списком последних ссылок."""
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("SELECT code, original_url, clicks FROM links ORDER BY clicks DESC LIMIT 10;")
+        cur.execute("SELECT code, original_url, clicks FROM links ORDER BY id DESC LIMIT 10;")
         links = cur.fetchall()
     conn.close()
     return render_template_string(PAGE, links=links, short=None)
@@ -127,23 +144,36 @@ def index():
 
 @app.route("/shorten", methods=["POST"])
 def shorten():
-    """Создать короткую ссылку из длинной."""
+    """Создать короткую ссылку из длинной (или вернуть существующую)."""
     original = request.form.get("url") or (request.json or {}).get("url")
     if not original:
         return jsonify({"error": "url is required"}), 400
 
-    code = generate_code()
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute(
-            "INSERT INTO links (code, original_url) VALUES (%s, %s) RETURNING code;",
-            (code, original),
-        )
-        code = cur.fetchone()["code"]
+        # Дедупликация: если такой URL уже сокращали - вернуть существующий код,
+        # не создавая новый. Так одна и та же ссылка всегда даёт один короткий код.
+        cur.execute("SELECT code FROM links WHERE original_url = %s;", (original,))
+        row = cur.fetchone()
+        if row:
+            code = row["code"]
+        else:
+            # Генерируем уникальный код (с защитой от редкого совпадения).
+            for _ in range(5):
+                candidate = generate_code()
+                cur.execute("SELECT 1 FROM links WHERE code = %s;", (candidate,))
+                if not cur.fetchone():
+                    code = candidate
+                    break
+            cur.execute(
+                "INSERT INTO links (code, original_url) VALUES (%s, %s) RETURNING code;",
+                (code, original),
+            )
+            code = cur.fetchone()["code"]
     conn.commit()
     conn.close()
 
-    short_url = request.host_url + code
+    short_url = build_short_url(code)
     # Если запрос был JSON (через curl/API) - вернуть JSON, иначе HTML
     if request.is_json:
         return jsonify({"short_url": short_url, "code": code})
