@@ -78,7 +78,7 @@ PAGE = """
   </style>
 </head>
 <body>
-  <h1>Вставь длинную ссылку — получишь короткую.</h1>
+  <h1>Вставь длинную ссылку и получишь короткую.</h1>
   <form method="post" action="/shorten">
     <input type="url" name="url" placeholder="https://example.com/very/long/url" required>
     <button type="submit">Сократить</button>
@@ -167,7 +167,7 @@ def follow(code):
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "okie"})
+    return jsonify({"status": "ok"})
 
 
 if __name__ == "__main__":
