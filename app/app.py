@@ -1,9 +1,3 @@
-"""
-URL Shortener - сокращатель ссылок.
-Flask-приложение: принимает длинный URL, выдаёт короткий код,
-по короткому коду делает редирект на оригинал.
-Данные хранятся в PostgreSQL.
-"""
 import os
 import string
 import random
@@ -17,20 +11,10 @@ app = Flask(__name__)
 
 
 def build_short_url(code):
-    """
-    Собрать короткую ссылку с ПРАВИЛЬНЫМ хостом и портом.
-
-    Приложение стоит за reverse proxy (Nginx), поэтому request.host_url
-    может не содержать внешний порт. Мы строим URL явно:
-    - берём Host из заголовка (Nginx передаёт его как localhost:8080);
-    - берём схему из X-Forwarded-Proto (http/https), если Nginx её прислал.
-    Это надёжнее, чем полагаться на автоматику.
-    """
     host = request.headers.get("X-Forwarded-Host") or request.host  # host:port
     scheme = request.headers.get("X-Forwarded-Proto", request.scheme)  # http/https
     return f"{scheme}://{host}/{code}"
 
-# --- Настройки из переменных окружения (передаются через compose.yml) ---
 DB_HOST = os.environ.get("DB_HOST", "db")
 DB_NAME = os.environ.get("DB_NAME", "urls")
 DB_USER = os.environ.get("DB_USER", "admin")
@@ -40,7 +24,6 @@ ALPHABET = string.ascii_letters + string.digits  # символы для кор�
 
 
 def get_conn():
-    """Создать подключение к базе данных."""
     return psycopg2.connect(
         host=DB_HOST, dbname=DB_NAME, user=DB_USER, password=DB_PASS,
         cursor_factory=RealDictCursor,
@@ -48,11 +31,6 @@ def get_conn():
 
 
 def init_db():
-    """
-    Создать таблицу при старте, если её ещё нет.
-    Повторяем попытки: база может стартовать чуть дольше, чем приложение
-    (помнишь урок про depends_on - он не ждёт готовности БД!).
-    """
     for attempt in range(10):
         try:
             conn = get_conn()
@@ -77,11 +55,9 @@ def init_db():
 
 
 def generate_code(length=6):
-    """Сгенерировать случайный короткий код."""
     return "".join(random.choices(ALPHABET, k=length))
 
 
-# --- Простая HTML-страница ---
 PAGE = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -133,7 +109,6 @@ PAGE = """
 
 @app.route("/")
 def index():
-    """Главная страница со списком последних ссылок."""
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT code, original_url, clicks FROM links ORDER BY id DESC LIMIT 10;")
@@ -144,21 +119,17 @@ def index():
 
 @app.route("/shorten", methods=["POST"])
 def shorten():
-    """Создать короткую ссылку из длинной (или вернуть существующую)."""
     original = request.form.get("url") or (request.json or {}).get("url")
     if not original:
         return jsonify({"error": "url is required"}), 400
 
     conn = get_conn()
     with conn.cursor() as cur:
-        # Дедупликация: если такой URL уже сокращали - вернуть существующий код,
-        # не создавая новый. Так одна и та же ссылка всегда даёт один короткий код.
         cur.execute("SELECT code FROM links WHERE original_url = %s;", (original,))
         row = cur.fetchone()
         if row:
             code = row["code"]
         else:
-            # Генерируем уникальный код (с защитой от редкого совпадения).
             for _ in range(5):
                 candidate = generate_code()
                 cur.execute("SELECT 1 FROM links WHERE code = %s;", (candidate,))
@@ -174,7 +145,6 @@ def shorten():
     conn.close()
 
     short_url = build_short_url(code)
-    # Если запрос был JSON (через curl/API) - вернуть JSON, иначе HTML
     if request.is_json:
         return jsonify({"short_url": short_url, "code": code})
     return render_template_string(PAGE, short=short_url, links=None)
@@ -182,7 +152,6 @@ def shorten():
 
 @app.route("/<code>")
 def follow(code):
-    """Редирект по короткому коду на оригинальный URL (+счётчик кликов)."""
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT original_url FROM links WHERE code = %s;", (code,))
@@ -198,8 +167,7 @@ def follow(code):
 
 @app.route("/health")
 def health():
-    """Проверка живости (пригодится для healthcheck/мониторинга)."""
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "okie"})
 
 
 if __name__ == "__main__":
