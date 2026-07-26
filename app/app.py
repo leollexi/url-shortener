@@ -8,10 +8,9 @@ from psycopg2.extras import RealDictCursor
 from flask import Flask, request, redirect, jsonify, render_template_string
 from prometheus_flask_exporter import PrometheusMetrics
 
-metrics = PrometheusMetrics(app)
-
 app = Flask(__name__)
 
+metrics = PrometheusMetrics(app)
 
 def build_short_url(code):
     host = request.headers.get("X-Forwarded-Host") or request.host  # host:port
