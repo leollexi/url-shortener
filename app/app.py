@@ -6,6 +6,9 @@ import time
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import Flask, request, redirect, jsonify, render_template_string
+from prometheus_flask_exporter import PrometheusMetrics
+
+metrics = PrometheusMetrics(app)
 
 app = Flask(__name__)
 

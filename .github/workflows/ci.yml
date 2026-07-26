@@ -72,6 +72,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
+            set -e
             cd ~/app
             docker compose pull
             docker compose up -d
