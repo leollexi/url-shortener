@@ -72,3 +72,15 @@ def test_different_url_different_code():
     r1 = client.post("/shorten", json={"url":"https://aaa.com"}, headers={"Host":"localhost:8080"})
     r2 = client.post("/shorten", json={"url":"https://bbb.com"}, headers={"Host":"localhost:8080"})
     assert r1.get_json()["code"] != r2.get_json()["code"]
+
+def test_version():
+    r = client.get("/version")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "version" in data and "git_sha" in data and "build_time" in data
+
+def test_health_checks_db():
+    r = client.get("/health")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["status"] == "ok" and data["database"] == "ok"

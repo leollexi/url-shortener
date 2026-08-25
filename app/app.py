@@ -22,6 +22,10 @@ DB_NAME = os.environ.get("DB_NAME", "urls")
 DB_USER = os.environ.get("DB_USER", "admin")
 DB_PASS = os.environ.get("DB_PASS", "secret")
 
+APP_VERSION = os.environ.get("APP_VERSION", "dev")
+GIT_SHA = os.environ.get("GIT_SHA", "unknown")
+BUILD_TIME = os.environ.get("BUILD_TIME", "unknown")
+
 ALPHABET = string.ascii_letters + string.digits  # символы для короткого кода
 
 
@@ -169,7 +173,24 @@ def follow(code):
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+            cur.fetchone()
+        conn.close()
+        return jsonify({"status": "ok", "database": "ok"})
+    except Exception as e:
+        return jsonify({"status": "degraded", "database": "down", "error": str(e)}), 503
+
+
+@app.route("/version") 
+def version():
+    return jsonify({
+        "version": APP_VERSION,
+        "git_sha": GIT_SHA,
+        "build_time": BUILD_TIME,
+    })  
 
 
 if __name__ == "__main__":
