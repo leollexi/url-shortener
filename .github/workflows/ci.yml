@@ -66,3 +66,22 @@ jobs:
             APP_VERSION=${{ github.ref_name }}
             GIT_SHA=${{ github.sha }}
             BUILD_TIME=${{ github.event.repository.updated_at }}
+  
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            set -e
+            cd ~/app
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
