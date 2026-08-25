@@ -3,12 +3,11 @@ name: CI/CD
 on:
   push:
     branches: [ main ]
-    tags: [ "v*" ]              # запускать также на push тегов v1.0.0 и т.п.
+    tags: [ "v*" ]             
   pull_request:
     branches: [ main ]
 
 jobs:
-  # === Задача 1: тесты ===
   test:
     runs-on: ubuntu-latest
     steps:
@@ -27,11 +26,10 @@ jobs:
         working-directory: app
         run: pytest -v
 
-  # === Задача 2: сборка и публикация (только после успешных тестов) ===
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'   # на PR только тестируем, не пушим образ
+    if: github.event_name == 'push'   
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,7 +40,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Генерируем красивые теги автоматически
       - name: Docker metadata (теги)
         id: meta
         uses: docker/metadata-action@v5
@@ -61,8 +58,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Передаём версию в образ через build-args -> они попадут в /version
-          build-args: |
+          build_args: |
             APP_VERSION=${{ github.ref_name }}
             GIT_SHA=${{ github.sha }}
             BUILD_TIME=${{ github.event.repository.updated_at }}
